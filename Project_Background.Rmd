@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Looking at triple negative breast cancer cells and knocking out Snai1 gene. Want to evaluate the effect of gene expression in doing that.
 
-**Conditions:** Reference (3) vs Test (3) - use same cell line (HS578T), cell type (epithelial cells) and disease (breast carcinoma). The only difference is that in Test, the gene (Snai1) is knocked out, and the Reference is not. \
+**Conditions:** Reference (3) vs Test (3) - use same cell line (HS578T), cell type (epithelial cells) and disease (breast carcinoma). The only difference is that in Test, the gene (Snai1 knockout) is knocked out, and the Reference is not (wild type genotype). \
 
 Starting with Raw counts (matrix of samples by gene, how many reads map per gene)
 
@@ -33,12 +33,13 @@ head(counts)
 
 -Numbers in matrix are the counts for each gene and sample
 
-## Including Plots
+## Metadata: information about the data
 
-You can also embed plots, for example:
+**Sample.Characteristic.genotype. :** column distinguishes if sample is Reference (wild type) or Test (Snai1 knockout)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+# Download metadata
+metadata = read.delim("https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5244/resources/ExperimentDesignFile.RnaSeq/experiment-design")
+head(metadata)
+
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

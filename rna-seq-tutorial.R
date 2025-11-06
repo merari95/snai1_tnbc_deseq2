@@ -35,7 +35,7 @@ head(counts)
 rownames(counts) = counts$Gene.ID
 head(counts)
 
-# Remove unused columns (gene ID and gene name)
+# Remove unused columns (Gene ID and Gene name)
 genes = counts[, c("Gene.ID", "Gene.Name")]
 counts = counts[, -c(1, 2)]
 head(counts)
@@ -59,21 +59,23 @@ metadata$genotype[metadata$genotype == 'wild type genotype'] = 'wildtype'
 metadata$genotype[metadata$genotype == 'Snai1 knockout'] = 'knockout'
 metadata
 
-# Turn genotype into a factor
+# Turn genotype into a factor (needed for DESeq2. Also wildtype is first because it will be the baseline level.)
 metadata$genotype = factor(metadata$genotype, levels=c("wildtype", "knockout"))
 metadata$genotype
 
 
 # ------------------------------------------------------------------------------
-# Spot check expression for knockout gene SNAI1
+# Spot check expression for knockout gene SNAI1 (make sure data makes sense to you)
 # ------------------------------------------------------------------------------
-
+ 
 gene_id = genes$Gene.ID[ genes$Gene.Name == 'SNAI1' ]
 gene_counts = counts[gene_id, ]
-gene_counts
+gene_counts   #you can see that some samples have higher expression counts than
+#the other samples. We can assume that the lower gene counts are associated with
+#knockout, but this is a just our preliminary guess. 
 
 gene_data = cbind(metadata, counts=as.numeric(gene_counts))
-gene_data
+gene_data     #our preliminary guess is true! higher counts for wildtype than knockout
 
 library(ggplot2)
 ggplot(gene_data, aes(x = genotype, y = counts, fill = genotype)) + geom_boxplot()
@@ -83,7 +85,11 @@ ggplot(gene_data, aes(x = genotype, y = counts, fill = genotype)) + geom_boxplot
 # Run DESeq
 # ------------------------------------------------------------------------------
 
-dds <- DESeqDataSetFromMatrix(countData=counts, colData=metadata, design=~genotype)
+dds <- DESeqDataSetFromMatrix(countData=counts, colData=metadata, design=~genotype) 
+#Specify the design. define all the variables that might cause change, in our 
+#case, it's only genotype.
+
+# dds: DeSeq data set that contains all of the data
 
 # Ignore genes with low counts
 dds <- dds[rowSums(counts(dds)) > 10, ]
