@@ -1,0 +1,44 @@
+---
+title: "Ampliseq transcriptomic array of REF seq. genes in Snai1 knock out triple negative breast cancer cells"
+output: html_document
+date: "2025-11-05"
+---
+
+Article Link: <https://www.ebi.ac.uk/gxa/experiments/E-MTAB-5244/Results>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Looking at triple negative breast cancer cells and knocking out Snai1 gene. Want to evaluate the effect of gene expression in doing that.
+
+**Conditions:** Reference (3) vs Test (3) - use same cell line (HS578T), cell type (epithelial cells) and disease (breast carcinoma). The only difference is that in Test, the gene (Snai1) is knocked out, and the Reference is not. \
+
+Starting with Raw counts (matrix of samples by gene, how many reads map per gene)
+
+```{r}
+
+counts = read.delim("https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5244/resources/DifferentialSecondaryDataFiles.RnaSeq/raw-counts")
+head(counts)
+
+```
+
+-Gene ID: gene
+
+-Gene Name: gene
+
+-Six samples/sample id's (3 reference, 3 test): ERR1736465 \| ERR1736466 \| ERR1736467 \| ERR1736468 \| ERR1736469 \| ERR1736470
+
+-Numbers in matrix are the counts for each gene and sample
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
