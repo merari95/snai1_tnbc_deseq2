@@ -92,14 +92,19 @@ dds <- DESeqDataSetFromMatrix(countData=counts, colData=metadata, design=~genoty
 # dds: DeSeq data set that contains all of the data
 
 # Ignore genes with low counts
-dds <- dds[rowSums(counts(dds)) > 10, ]
+dds <- dds[rowSums(counts(dds)) > 10, ] #sum across each row (gene) and genes 
+#with greater than 10 counts will be kept
 
 # Run DESeq
 dds <- DESeq(dds)
 
 # Compare expression
 res = results(dds, contrast=c("genotype", "knockout", "wildtype"), alpha=1e-5)
-res
+res   #<-output of DESeq2
+
+#genotype: name of column
+#comparing knockout vs wildtype
+#alpha: p-value we will be using
 
 # Other examples of design formula:
 # - https://www.ebi.ac.uk/gxa/experiments/E-MTAB-8031/Results
@@ -127,22 +132,24 @@ abline(model)
 
 
 # ------------------------------------------------------------------------------
-# Spot checks
+# Spot checks - Compare results to GXA (compare to Gene Results archive/online)
 # ------------------------------------------------------------------------------
 
-# Compare results to GXA
-# https://www.ebi.ac.uk/gxa/experiments/E-MTAB-5244/Results?specific=true&geneQuery=%255B%255D&filterFactors=%257B%257D&cutoff=%257B%2522foldChange%2522%253A11%252C%2522pValue%2522%253A0.01%257D&regulation=%2522UP_DOWN%2522
+# GXA results link: https://www.ebi.ac.uk/gxa/experiments/E-MTAB-5244/Results?specific=true&geneQuery=%255B%255D&filterFactors=%257B%257D&cutoff=%257B%2522foldChange%2522%253A11%252C%2522pValue%2522%253A0.01%257D&regulation=%2522UP_DOWN%2522
 
 # Merge gene name into data frame so can compare to GXA UI using gene names
 res_df = as.data.frame(res)
 head(res_df)
 head(genes)
-res_df = merge(res_df, genes, by='row.names')
-head(res_df)
+res_df = merge(res_df, genes, by='row.names') 
+head(res_df) 
 
-genes_to_check = c("THY1", "SFMBT2", "PASD1", "SNAI1")
+genes_to_check = c("THY1", "SFMBT2", "PASD1", "SNAI1") #this extracts only the genes you're interested in
 res_df[res_df$Gene.Name %in% genes_to_check, ]
 
+# notice that ex: THY1 has log2FoldChange of 12.371934, which is the same as the GXA results online (12.4) 
+# notice that ex: SFMBT2 has log2FoldChange of -11.807534 which is the same as the GXA results online (-11.8) 
+# Hence: our results match the online results!
 
 # ------------------------------------------------------------------------------
 # Visualization
@@ -160,40 +167,40 @@ EnhancedVolcano(res, lab=rownames(res), x='log2FoldChange', y='pvalue')
 BiocManager::install("biomaRt")
 library(biomaRt)
 
-# Find dataset name in Ensembl
-ensembl <- useEnsembl(biomart="genes")
-datasets = listDatasets(ensembl)
+# Find dataset name in Ensembl 
+ensembl <- useEnsembl(biomart="genes") #looking at gene information
+datasets = listDatasets(ensembl) #list all datasets that Ensembl has
 head(datasets)
 
-dataset_nb = grep("human", datasets$description, ignore.case=TRUE)
-dataset_nb
+dataset_nb = grep("human", datasets$description, ignore.case=TRUE) #want the human data, so set description = human
+dataset_nb #human data is in row 80, so extract it
 
-dataset = datasets$dataset[dataset_nb]
+dataset = datasets$dataset[dataset_nb] #human data is in row 80, so extract it--> dataset
 dataset
 
-ensembl <- useDataset(dataset=dataset, mart=ensembl)
+ensembl <- useDataset(dataset=dataset, mart=ensembl) 
 
 # Get coordinates of all genes
 attributes <- c("ensembl_gene_id", "chromosome_name", "start_position", "end_position")
 values <- list(ensembl_gene_id=c())
-all.genes <- getBM(attributes=attributes, values=values, mart=ensembl)
-head(all.genes)
+all.genes <- getBM(attributes=attributes, values=values, mart=ensembl) #getting data from Biomart (BM)
+head(all.genes) # this is the dataset with human, just as we wanted
 
-# Rename column so it matches res_df
+# Rename column so it matches res_df to make the merge in the next step happen
 head(res_df)
 colnames(all.genes)[1] = "Gene.ID"
 head(all.genes)
 
-# Merge the DESeq output with the Ensembl gene coordinates
+# Merge the DESeq output with the Ensembl gene coordinates so you know where each gene is located; merge by Gene.ID column
 merged_data <- merge(all.genes, res_df, by="Gene.ID")
-head(merged_data)
+head(merged_data) #now you have all the info from both dataframes (your DESeq results and Ensembl data i.e. start/stop postions)
 
-# Add chr prefix to chromosome names
+# Add chr prefix to chromosome names to match the human genome reference
 merged_data$chromosome_name <- paste("chr", merged_data$chromosome_name, sep = "")
 head(merged_data)
-write.csv(merged_data, "~/Documents/rna-seq/deseq.csv", row.names = FALSE)
+write.csv(merged_data, "~/Bioinformatics_Projects/snai1_tnbc_deseq2/deseq.csv", row.names = FALSE) #SAVE MERGED DATA TO CSV FILE
 
-# Same for subset
+# Same for subset (only want the data for genes we are interested in)
 merged_data_subset = merged_data[merged_data$Gene.Name %in% genes_to_check, ]
 head(merged_data_subset)
-write.csv(merged_data_subset, "~/Documents/rna-seq/deseq_subset.csv", row.names = FALSE)
+write.csv(merged_data_subset, "~/Bioinformatics_Projects/snai1_tnbc_deseq2/deseq_subset.csv", row.names = FALSE)

@@ -6,6 +6,8 @@ date: "2025-11-05"
 
 Article Link: <https://www.ebi.ac.uk/gxa/experiments/E-MTAB-5244/Results>
 
+Followed this Youtube tutorial: <https://www.youtube.com/watch?v=NGbZmlGLG5w>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -14,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Looking at triple negative breast cancer cells and knocking out Snai1 gene. Want to evaluate the effect of gene expression in doing that.
 
-**Conditions:** Reference (3) vs Test (3) - use same cell line (HS578T), cell type (epithelial cells) and disease (breast carcinoma). The only difference is that in Test, the gene (Snai1 knockout) is knocked out, and the Reference is not (wild type genotype). \
+**Conditions:** Reference (3) vs Test (3) - use same cell line (HS578T), cell type (epithelial cells) and disease (breast carcinoma). The only difference is that in Test, the gene (Snai1 knockout) is knocked out, and the Reference is not (wild type genotype).\
 
 Starting with Raw counts (matrix of samples by gene, how many reads map per gene)
 
@@ -43,3 +45,239 @@ metadata = read.delim("https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5244
 head(metadata)
 
 ```
+
+## DESeq2:
+
+```{r}
+library(DESeq2)
+
+# ------------------------------------------------------------------------------
+# Download data
+# ------------------------------------------------------------------------------
+
+# Download raw counts
+counts = read.delim("https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5244/resources/DifferentialSecondaryDataFiles.RnaSeq/raw-counts")
+
+
+# Download metadata
+metadata = read.delim("https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5244/resources/ExperimentDesignFile.RnaSeq/experiment-design")
+
+
+
+
+# ------------------------------------------------------------------------------
+# Wrangle data for DESeq2
+# ------------------------------------------------------------------------------
+
+# DESeq expects the counts to have gene IDs as row names
+rownames(counts) = counts$Gene.ID
+
+
+# Remove unused columns (Gene ID and Gene name)
+genes = counts[, c("Gene.ID", "Gene.Name")]
+counts = counts[, -c(1, 2)]
+
+
+# DESeq expects the metadata matrix to have sample IDs in the rownames
+
+rownames(metadata) = metadata$Run
+
+
+# Only keep columns of interest
+metadata = metadata[, c("Sample.Characteristic.genotype."), drop=FALSE]
+# Look at metadata to see how the variables change with respect to each other
+
+
+# Rename column
+colnames(metadata) = c("genotype")
+
+
+# Remove spaces in names to avoid DESeq warnings
+metadata$genotype[metadata$genotype == 'wild type genotype'] = 'wildtype'
+metadata$genotype[metadata$genotype == 'Snai1 knockout'] = 'knockout'
+
+
+# Turn genotype into a factor (needed for DESeq2. Also wildtype is first because it will be the baseline level.)
+metadata$genotype = factor(metadata$genotype, levels=c("wildtype", "knockout"))
+metadata$genotype
+
+
+# ------------------------------------------------------------------------------
+# Spot check expression for knockout gene SNAI1 (make sure data makes sense to you)
+# ------------------------------------------------------------------------------
+ 
+gene_id = genes$Gene.ID[ genes$Gene.Name == 'SNAI1' ]
+gene_counts = counts[gene_id, ]
+
+gene_data = cbind(metadata, counts=as.numeric(gene_counts))
+
+
+
+
+# ------------------------------------------------------------------------------
+# Run DESeq
+# ------------------------------------------------------------------------------
+
+dds <- DESeqDataSetFromMatrix(countData=counts, colData=metadata, design=~genotype) 
+#Specify the design. define all the variables that might cause change, in our 
+#case, it's only genotype.
+
+# dds: DeSeq data set that contains all of the data
+
+# Ignore genes with low counts
+dds <- dds[rowSums(counts(dds)) > 10, ] #sum across each row (gene) and genes 
+#with greater than 10 counts will be kept
+
+# Run DESeq
+dds <- DESeq(dds)
+
+# Compare expression
+res = results(dds, contrast=c("genotype", "knockout", "wildtype"), alpha=1e-5)
+res   #<-output of DESeq2
+
+```
+
+baseMean: base mean count
+
+log2FoldChange: look at this when you want to see if gene is up-regulated or down-regulated
+
+lfcSE:
+
+stat:
+
+pvalue:
+
+padj: adjusted p-value after multiple hypothesis testing
+
+## More about DESeq's (DESeqDataSetFromMatrix) 'Design' Parameter:
+
+```{r}
+# Other examples of design formula:
+# Example A - https://www.ebi.ac.uk/gxa/experiments/E-MTAB-8031/Results
+#     * RNA-seq on lung tumors
+#     * Variables:
+#         1. Location: tumor cells or normal tissue nearby
+#         2. Sex of the patient
+#     * Formula = ~sex + location #note that the order doesn't really matter, but DESEq will look at last variable when doing the contrast; best to be explicit with the order in the 'Design' param
+#
+# Example B- https://www.ebi.ac.uk/gxa/experiments/E-MTAB-10041/Results
+#     * RNA-seq on mouse colon cells
+#     * Variables:
+#         1. Compound: cancer drug or not
+#         2. Genotype: wild type mouse, and 2 other genotypes of TP53 mutations
+
+#in this experiment, they are interested what happens to gene expression when they add the compound in every genotype separately
+
+#     * Formula = ~genotype + compound  <-this doesn't make sense since want to compare each genotype separately
+
+#The following Design Formula is correct, must group them: 
+#     * Formula = ~group
+#         metadata$group = factor(paste(metadata$genotype, metadata$compound))
+```
+
+## Comparing our Results with Online GXA results:
+
+```{r}
+# Compare results to GXA (compare to Gene Results archive/online)
+# GXA results link: https://www.ebi.ac.uk/gxa/experiments/E-MTAB-5244/Results?specific=true&geneQuery=%255B%255D&filterFactors=%257B%257D&cutoff=%257B%2522foldChange%2522%253A11%252C%2522pValue%2522%253A0.01%257D&regulation=%2522UP_DOWN%2522
+
+# Merge gene name into data frame so can compare to GXA UI using gene names
+res_df = as.data.frame(res)
+head(res_df)
+head(genes)
+res_df = merge(res_df, genes, by='row.names') 
+head(res_df) 
+
+genes_to_check = c("THY1", "SFMBT2", "PASD1", "SNAI1") #this extracts only the genes you're interested in
+res_df[res_df$Gene.Name %in% genes_to_check, ]
+
+```
+
+-Notice that ex: THY1 has log2FoldChange of 12.371934, which is the same as the GXA results online (12.4). log2FoldChange is Positive, so THY1 gene is upregulated
+
+-Notice that ex: SFMBT2 has log2FoldChange of -11.807534 which is the same as the GXA results online (-11.8). log2FoldChange is Negative, so SFMBT2 is downregulated
+
+-Notice that ex: SNAI1 has log2FoldChange of -4.155055. log2FoldChange is negative, which is downregulated, which is expected because it was knocked out!
+
+-Hence: our results match the online results!
+
+# MA Plot -
+
+-   log fold change as a function of the mean of normalized counts
+
+-   blue dots: are points that pass the p-value threshold that you set up in res (in our case alpha = 1e-5)
+
+```{r}
+plotMA(res)
+```
+
+# Volcano Plot -
+
+-   x-axis: Log fold change
+
+-   y-axis: negative log 10 of the p-value; the higher the number, the smaller the p-value hence more significant
+
+-   hence the higher the genes are on the y-axis, the more significant they are in terms of up-regulated or down-regulated
+
+```{r}
+# Volcano plot
+BiocManager::install('EnhancedVolcano')
+library(EnhancedVolcano)
+EnhancedVolcano(res, lab=rownames(res), x='log2FoldChange', y='pvalue')
+
+```
+
+-in our example ENSG00000151632 (downregulated bc negative) and ENSG00000108691 (upregulated bc positive) are the most signficant
+
+# Circos Plot -
+
+-   shows across the genome what is the gene expression (upregulation/ downregulation) OR maybe want to plot p-value OR maybe you want to show where the gene names are
+-   to do these plots, you need to have more than just the Gene ID and Gene Name; need to know where gene is located in human genome (what chromosome, what is start and stop position)
+-   Follow the steps below get the info needed to make a Circos plot on Circa.omgenomics.com; for how to input into Circa website, follow along on Youtube video at 24:49.
+
+```{r}
+# Circos plot
+BiocManager::install("biomaRt")
+library(biomaRt)
+
+# Find dataset name in Ensembl 
+ensembl <- useEnsembl(biomart="genes") #looking at gene information
+datasets = listDatasets(ensembl) #list all datasets that Ensembl has
+head(datasets)
+
+dataset_nb = grep("human", datasets$description, ignore.case=TRUE) #want the human data, so set description = human
+dataset_nb #human data is in row 80, so extract it
+
+dataset = datasets$dataset[dataset_nb] #human data is in row 80, so extract it--> dataset
+dataset
+
+ensembl <- useDataset(dataset=dataset, mart=ensembl) 
+
+# Get coordinates of all genes
+attributes <- c("ensembl_gene_id", "chromosome_name", "start_position", "end_position")
+values <- list(ensembl_gene_id=c())
+all.genes <- getBM(attributes=attributes, values=values, mart=ensembl) #getting data from Biomart (BM)
+head(all.genes) # this is the dataset with human, just as we wanted
+
+# Rename column so it matches res_df to make the merge in the next step happen
+head(res_df)
+colnames(all.genes)[1] = "Gene.ID"
+head(all.genes)
+
+# Merge the DESeq output with the Ensembl gene coordinates so you know where each gene is located; merge by Gene.ID column
+merged_data <- merge(all.genes, res_df, by="Gene.ID")
+head(merged_data) #now you have all the info from both dataframes (your DESeq results and Ensembl data i.e. start/stop postions)
+
+# Add chr prefix to chromosome names to match the human genome reference
+merged_data$chromosome_name <- paste("chr", merged_data$chromosome_name, sep = "")
+head(merged_data)
+write.csv(merged_data, "~/Bioinformatics_Projects/snai1_tnbc_deseq2/deseq.csv", row.names = FALSE) #SAVE MERGED DATA TO CSV FILE
+
+# Same for subset (only want the data for genes we are interested in)
+merged_data_subset = merged_data[merged_data$Gene.Name %in% genes_to_check, ]
+head(merged_data_subset)
+write.csv(merged_data_subset, "~/Bioinformatics_Projects/snai1_tnbc_deseq2/deseq_subset.csv", row.names = FALSE)
+
+```
+
+![](rna-seq-tutorial_circa.png)
